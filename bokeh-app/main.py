@@ -24,7 +24,10 @@ from bokeh.io import curdoc
 
 from matplotlib.colors import LinearSegmentedColormap
 
-from data import evidence_groups
+evidence_groups = {"E": ['ABS1Da_js', 'ABS1Db_js', 'ABS1Ma_js', 'ABS1Mb_js', 'ABS2D_js', 'ABS2M_js', 'ABS3D_js'],
+                   "H": ['zero_13_js', 'zero_26_js', 'point_14_js', 'point_27_js', 'one_15_js', 'one_25_js',],
+                   "M": ['cp_js'],
+                   "C": ['stunn_js', 'su7_js', 'hu_js']}
 
 
 score_palette = ['#9bb4e7', '#93a3e0', '#8b92d9', '#8381d1', '#7a71c9', '#7260c0', '#6a4fb6', '#623eac', '#5a2ca0']
@@ -126,9 +129,11 @@ def get_evidence_formatter(my_col, hover_text):
 
 
 evidence_descr = {'E': "Evers et al BNPage PCP dataset (https://doi.org/10.1038/s41467-021-23919-x)",
-                    'H': "Hillier et al BNPage PCP dataset (https://doi.org/10.1016/j.celrep.2019.07.019)",
-                    'M': 'MacRaild et al SEC PCP dataset (unpublished)',
-                    'C': 'coexpression datasets'}
+                  'H': "Hillier et al BNPage PCP dataset (https://doi.org/10.1016/j.celrep.2019.07.019)",
+                  'M': 'MacRaild et al SEC PCP dataset (unpublished)',
+                  'C': 'coexpression datasets'}
+
+
 def get_hover_text(evidence_class):
     if evidence_class in evidence_descr:
         return f"""Percentile rank for this interaction in the {evidence_descr[evidence_class]}"""
