@@ -18,7 +18,8 @@ import pandas as pd
 import networkx as nx
 
 from bokeh.models import ColumnDataSource, Circle, MultiLine, HoverTool, AutocompleteInput, DataTable, \
-    TableColumn, Button, Column, Row, LabelSet, HTMLTemplateFormatter, CDSView, BooleanFilter, FileInput, CustomJS
+    TableColumn, Button, Column, Row, LabelSet, HTMLTemplateFormatter, CDSView, BooleanFilter, FileInput, \
+    CustomJS, Checkbox
 from bokeh.plotting import figure, from_networkx
 from bokeh.io import curdoc
 
@@ -167,9 +168,9 @@ def build_data_table(edge_ds, view=None, table=None):
 
     if table is None:
         if view is None:
-            table = DataTable(source=edge_ds, columns=columns, width=800, index_position=None)
+            table = DataTable(source=edge_ds, columns=columns, width=800, index_position=None, selectable='checkbox')
         else:
-            table = DataTable(source=edge_ds, view=view, columns=columns, width=800, index_position=None)
+            table = DataTable(source=edge_ds, view=view, columns=columns, width=800, index_position=None, selectable='checkbox')
     else:
         table.source = edge_ds
         table.columns = columns
@@ -205,33 +206,33 @@ def update_table_on_selection(selected_mask):
     neighbour_nodes = set(filtered_df.protein1).union(filtered_df.protein2)
     neighbour_edge_mask = df.protein1.isin(neighbour_nodes) & df.protein2.isin(neighbour_nodes)
     mask = selected_mask | neighbour_edge_mask
-    view.filters = [BooleanFilter(mask), ]
+    view.filter = BooleanFilter(mask)
     # ... and a hack workaround to force update [https://github.com/bokeh/bokeh/issues/11955]:
-    table.visible = False
-    table.visible = True
+    #table.visible = False
+    #table.visible = True
 
 
 def remove_row(event):
     idx = cds.selected.indices
-    mask = view.filters[0].booleans
+    mask = view.filter.booleans
     for i in idx:
         if not mask[i]: # debug
             print(f"Trying to remove missing row: index={idx}")
         mask[i] = False
-    view.filters = [BooleanFilter(mask), ]
+    view.filter = BooleanFilter(mask)
     # ... and a hack workaround to force update [https://github.com/bokeh/bokeh/issues/11955]:
-    table.visible = False
-    table.visible = True
+    #table.visible = False
+    #table.visible = True
 
 
 def build_graph(cds, view):
     cp_graph = nx.Graph()
 
-    selection_mask = view.filters[0].booleans
+    selection_mask = view.filter.booleans
     indices = df.index[selection_mask]
     n_active_nodes = sum(selection_mask)
     # scale linewidth and node size according to the number of nodes to plot
-    scale = 1 + 14/np.sqrt(n_active_nodes)
+    scale = (1 + 14/np.sqrt(n_active_nodes))
 
     node_descr = {}
     for idx in indices:
@@ -260,7 +261,7 @@ def build_graph(cds, view):
     for node in cp_graph:
         node_alpha[node] = 1.0
         node_color[node] = 'lightgrey'
-        node_size[node] = 5 * scale
+        node_size[node] = scale/100
 
     nx.set_node_attributes(cp_graph, node_descr, 'node_descr')
     nx.set_node_attributes(cp_graph, node_color, 'node_color')
@@ -289,7 +290,7 @@ def update_node_labels(x, y, text):
 def plot_graph(event):
     cp_graph = build_graph(cds, view)
     cp_graph_renderer = from_networkx(cp_graph, nx.spring_layout)
-    cp_graph_renderer.node_renderer.glyph = Circle(size='node_size', fill_color='node_color', line_color='node_color',
+    cp_graph_renderer.node_renderer.glyph = Circle(radius='node_size', fill_color='node_color', line_color='node_color',
                                                    line_alpha='alpha', fill_alpha='alpha')
     cp_graph_renderer.edge_renderer.glyph = MultiLine(line_color="edge_color", line_alpha='alpha',
                                                       line_width='line_width')
@@ -336,10 +337,10 @@ def plot_graph(event):
 
 
 def reset_table(event):
-    view.filters[0] = BooleanFilter([True, ]*len(df))
+    view.filter = BooleanFilter([True, ]*len(df))
     # ... and a hack workaround to force update [https://github.com/bokeh/bokeh/issues/11955]:
-    table.visible = False
-    table.visible = True
+    #table.visible = False
+    #table.visible = True
     #cds.data = dict(ColumnDataSource(df).data)
 
 
@@ -411,8 +412,8 @@ node_hover_tool = HoverTool(tooltips=[("ID", "@index"), ("Description", "@node_d
 plot = figure()
 #plot.add_tools(node_hover_tool, TapTool(), BoxSelectTool())
 plot.add_tools(node_hover_tool)
-plot.plot_width = 600
-plot.plot_height = 600
+plot.width = 600
+plot.height = 600
 plot.grid.grid_line_color = None
 plot.xaxis.visible = False
 plot.yaxis.visible = False
@@ -420,7 +421,7 @@ plot.yaxis.visible = False
 
 df = pd.DataFrame()
 cds = ColumnDataSource(df)
-view = CDSView(source=cds, filters=[BooleanFilter([True, ]*len(df))])
+view = CDSView(filter=BooleanFilter([True, ]*len(df)))
 table = build_data_table(cds, view=view)
 
 
@@ -438,7 +439,7 @@ def load_data(attr, old, new):
     df.Crosslink = df.Crosslink.fillna('')
     cds = ColumnDataSource(df)
     cds.selected.on_change('indices', highlight_graph_edge)
-    view = CDSView(source=cds, filters=[BooleanFilter([True, ] * len(df))])
+    view = CDSView(filter=BooleanFilter([True, ] * len(df)))
     table = build_data_table(cds, view=view, table=table)
     proteins = sorted(set(df.protein1).union(df.protein2))
     protein_selector.completions = proteins
@@ -455,9 +456,12 @@ controls = Row(protein_selector, expand_neighbours, remove_row_button, reset_but
 if len(sys.argv) > 1:
     file_name = sys.argv[1]
 else:
-    file_name = join(dirname(__file__), 'data', 'gbt_draft_060622_Dnorm_edge_summary.csv')
+    file_name = join(dirname(__file__), 'data', 'gbt_draft_060622_edge_summary.csv')
+
+print(f"Starting with {file_name}")
 
 if not os.path.exists(file_name):
+    print("Datafile does not exist")
     get_file = FileInput(accept='.csv')
     get_file.on_change('value', load_data)
     controls = Column(get_file, controls)
